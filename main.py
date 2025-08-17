@@ -9,6 +9,10 @@ from tqdm import tqdm
 from face import FaceDetector
 from counter import Counter
 from manager import FileManager
+from tagger import BlipTagger # Import the new Tagger
+
+# Supported image extensions for tagging
+TAGGING_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp']
 
 def process_images(target_dir: Path, file_manager: FileManager, face_detector: FaceDetector, counter: Counter):
     image_files = file_manager.get_image_files()
@@ -87,9 +91,73 @@ def process_images(target_dir: Path, file_manager: FileManager, face_detector: F
     counter.set_total_time(total_time)
     print(counter.get_summary())
 
+def run_tagging_phase(target_dir: Path, config_path: str = "tagger_config.yaml"):
+    print("\n" + "="*30)
+    print("Starting BLIP Tagging Phase...")
+    print("="*30)
+
+    try:
+        blip_tagger = BlipTagger(config_path=config_path)
+    except Exception as e:
+        print(f"BLIP Tagger 초기화 중 오류 발생: {e}")
+        return
+
+    # List of (directory_path, prefix) tuples to process
+    dirs_to_tag = []
+
+    # Add the target_dir itself if it contains images
+    # The prefix for images directly in target_dir will be its own name
+    dirs_to_tag.append((target_dir, target_dir.name))
+
+    # Add immediate subdirectories, excluding special ones
+    for item in target_dir.iterdir():
+        if item.is_dir() and item.name not in ['Fail', 'letterbox']:
+            dirs_to_tag.append((item, item.name))
+    
+    if not dirs_to_tag:
+        print("태그를 생성할 폴더를 찾지 못했습니다.")
+        return
+
+    total_images_to_tag = 0
+    for dir_path, _ in dirs_to_tag:
+        for file_path in dir_path.iterdir():
+            if file_path.suffix.lower() in TAGGING_IMAGE_EXTENSIONS:
+                total_images_to_tag += 1
+
+    if total_images_to_tag == 0:
+        print("태그를 생성할 이미지를 찾지 못했습니다.")
+        return
+
+    with tqdm(total=total_images_to_tag, desc="Tagging Progress", unit="file", position=2, leave=False) as pbar:
+        for dir_path, prefix in dirs_to_tag:
+            print(f"\nProcessing folder: {dir_path.name} (Prefix: {prefix})")
+            for image_path in dir_path.iterdir():
+                if image_path.suffix.lower() in TAGGING_IMAGE_EXTENSIONS:
+                    try:
+                        caption, error = blip_tagger.generate_tag(str(image_path))
+                        if error:
+                            print(f"Error tagging {image_path.name}: {error}")
+                            continue
+
+                        postfix = blip_tagger.get_postfix()
+                        final_content = f"{prefix}, {caption}{postfix}" # Add comma after prefix
+
+                        txt_file_path = image_path.with_suffix('.txt')
+                        with open(txt_file_path, 'w', encoding='utf-8') as f:
+                            f.write(final_content)
+                        
+                    except Exception as e:
+                        print(f"Error processing {image_path.name} for tagging: {e}")
+                    finally:
+                        pbar.update(1)
+
+    print("\n" + "="*30)
+    print("BLIP Tagging Phase Completed.")
+    print("="*30)
+
 def main():
     parser = argparse.ArgumentParser(
-        description="지정된 폴더의 이미지를 스캔하여 얼굴이 1개인 이미지를 'Pass' 폴더로 분류합니다.",
+        description="지정된 폴더의 이미지를 스캔하여 얼굴이 1개인 이미지를 'Pass' 폴더로 분류하고 BLIP 태그를 생성합니다.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -122,10 +190,15 @@ def main():
     print(f"Using device: {device}")
 
     try:
+        # Phase 1: Image Processing and Sorting
         face_detector = FaceDetector()
         file_manager = FileManager(target_path)
         counter = Counter()
         process_images(target_path, file_manager, face_detector, counter)
+
+        # Phase 2: BLIP Tagging
+        run_tagging_phase(target_path)
+
     except Exception as e:
         print(f"프로세스 초기화 중 치명적 오류 발생: {e}")
 

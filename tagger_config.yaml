@@ -1,0 +1,33 @@
+# Configuration for the BLIP Tagger
+
+# --- Model Location ---
+# This can be EITHER a model identifier from the Hugging Face Hub 
+# (e.g., "Salesforce/blip-image-captioning-base") OR a path to a local 
+# directory containing a downloaded model (e.g., "./models/blip-base").
+model_path: "models/blip-image-captioning-base"
+
+# --- Device Settings ---
+# 'auto' will use GPU if available, otherwise CPU.
+# You can also force it, e.g., 'cuda:0' or 'cpu'.
+device: "auto"
+
+# --- Generation Settings ---
+# These parameters control the caption generation process.
+# See Hugging Face documentation for more details on what these do.
+decoding:
+  # 'num_beams' > 1 enables beam search. 'num_beams: 1' uses greedy search.
+  num_beams: 1
+  # 'do_sample: True' enables sampling. Required for 'top_p'.
+  do_sample: True
+  top_p: 0.7
+  max_length: 150
+  min_length: 10
+  # Note: Current implementation processes one image at a time, 
+  # so 'batch_size' here is conceptual for single image generation.
+  batch_size: 1
+
+# --- Output Formatting ---
+# Add custom text before or after the generated caption.
+formatting:
+  prefix: ""
+  postfix: ""

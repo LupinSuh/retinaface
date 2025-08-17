@@ -78,7 +78,7 @@ class FaceDetector:
             y_start, y_end, x_start, x_end = coords
             
             if y_end > y_start and x_end > x_start:
-                print(f"  - Cropping: {os.path.basename(img_path)}. Original: {w}x{h}, New: {(x_end-x_start)}x{(y_end-y_start)}")
+                # print(f"  - Cropping: {os.path.basename(img_path)}. Original: {w}x{h}, New: {(x_end-x_start)}x{(y_end-y_start)}")
                 img = np.ascontiguousarray(img[y_start:y_end, x_start:x_end])
                 was_cropped = True
 
