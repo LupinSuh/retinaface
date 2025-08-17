@@ -49,3 +49,12 @@ class FileManager:
         except Exception as e:
             # This exception should be caught and logged in the main loop
             raise e
+
+    def move_to_letterbox(self, image_path: Path):
+        """Moves a file to a 'letterbox' subdirectory."""
+        try:
+            letterbox_dir = image_path.parent / 'letterbox'
+            letterbox_dir.mkdir(exist_ok=True)
+            shutil.move(str(image_path), str(letterbox_dir / image_path.name))
+        except Exception as e:
+            raise e

@@ -34,24 +34,40 @@ def process_images(target_dir: Path, file_manager: FileManager, face_detector: F
                 
                 log_bar.set_description_str(f"Processing: {file_name.ljust(terminal_width - 15)}")
 
+                # Initial validation (is it a valid image file, resolution)
                 validation_result = file_manager.validate_image(image_path)
                 if validation_result != "Valid":
                     counter.increment(validation_result)
                     file_manager.move_file(image_path, "Fail")
                     continue
 
-                faces, _ = face_detector.detect_faces(str(image_path))
-                num_faces = len(faces)
+                # Process image for faces and letterbox
+                faces, _, has_letterbox = face_detector.process_image(str(image_path))
+                if faces is None: # Error reading image in process_image
+                    counter.increment("Errors")
+                    file_manager.move_file(image_path, "Fail")
+                    continue
 
+                # Determine face detection result
+                num_faces = len(faces)
                 if num_faces == 0:
-                    result = "NoFace"
+                    face_result = "NoFace"
                 elif num_faces == 1:
-                    result = "Pass"
+                    face_result = "Pass"
                 else:
-                    result = "MultiFace"
+                    face_result = "MultiFace"
                 
-                counter.increment(result)
-                file_manager.move_file(image_path, result)
+                counter.increment(face_result)
+
+                # Handle file based on results
+                if face_result == "Pass":
+                    if has_letterbox:
+                        # Passed face check, but has letterbox -> move to letterbox folder
+                        file_manager.move_to_letterbox(image_path)
+                    # else: file passed and has no letterbox, so do nothing, leave it in place.
+                else:
+                    # Failed face check for any reason
+                    file_manager.move_file(image_path, face_result)
 
             except Exception as e:
                 log_bar.write(f"이미지 처리 중 예기치 않은 오류 발생: {image_path}, {e}")
