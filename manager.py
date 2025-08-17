@@ -2,6 +2,7 @@ import os
 import shutil
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
+import cv2
 
 SUPPORTED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
 
@@ -50,11 +51,10 @@ class FileManager:
             # This exception should be caught and logged in the main loop
             raise e
 
-    def move_to_letterbox(self, image_path: Path):
-        """Moves a file to a 'letterbox' subdirectory."""
+    def overwrite_image(self, img_data, image_path: Path):
+        """Overwrites the original image file with new image data."""
         try:
-            letterbox_dir = image_path.parent / 'letterbox'
-            letterbox_dir.mkdir(exist_ok=True)
-            shutil.move(str(image_path), str(letterbox_dir / image_path.name))
+            # Use the original file extension
+            cv2.imwrite(str(image_path), img_data)
         except Exception as e:
             raise e

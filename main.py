@@ -41,12 +41,17 @@ def process_images(target_dir: Path, file_manager: FileManager, face_detector: F
                     file_manager.move_file(image_path, "Fail")
                     continue
 
-                # Process image for faces and letterbox
-                faces, _, has_letterbox = face_detector.process_image(str(image_path))
+                # Process image for letterbox cropping and face detection
+                faces, img_data, was_cropped = face_detector.process_image(str(image_path))
                 if faces is None: # Error reading image in process_image
                     counter.increment("Errors")
                     file_manager.move_file(image_path, "Fail")
                     continue
+                
+                # Overwrite original file if it was cropped
+                if was_cropped:
+                    log_bar.write(f"  - Letterbox detected and cropped for: {file_name}")
+                    file_manager.overwrite_image(img_data, image_path)
 
                 # Determine face detection result
                 num_faces = len(faces)
@@ -59,14 +64,8 @@ def process_images(target_dir: Path, file_manager: FileManager, face_detector: F
                 
                 counter.increment(face_result)
 
-                # Handle file based on results
-                if face_result == "Pass":
-                    if has_letterbox:
-                        # Passed face check, but has letterbox -> move to letterbox folder
-                        file_manager.move_to_letterbox(image_path)
-                    # else: file passed and has no letterbox, so do nothing, leave it in place.
-                else:
-                    # Failed face check for any reason
+                # If the face result was a fail, move the (potentially cropped) file
+                if face_result != "Pass":
                     file_manager.move_file(image_path, face_result)
 
             except Exception as e:
