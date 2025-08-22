@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from tqdm import tqdm
 
-from face import FaceDetector
 from counter import Counter
 from manager import FileManager
 from tagger import BlipTagger # Import the new Tagger
@@ -14,7 +13,7 @@ from tagger import BlipTagger # Import the new Tagger
 # Supported image extensions for tagging
 TAGGING_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp']
 
-def process_images(target_dir: Path, file_manager: FileManager, face_detector: FaceDetector, counter: Counter):
+def process_images(target_dir: Path, file_manager: FileManager, face_detector: 'FaceDetector', counter: Counter):
     image_files = file_manager.get_image_files()
     if not image_files:
         print("처리할 이미지를 찾지 못했습니다.")
@@ -91,13 +90,13 @@ def process_images(target_dir: Path, file_manager: FileManager, face_detector: F
     counter.set_total_time(total_time)
     print(counter.get_summary())
 
-def run_tagging_phase(target_dir: Path, config_path: str = "tagger_config.yaml"):
+def run_tagging_phase(target_dir: Path, config_path: str = "tagger_config.yaml", device=None):
     print("\n" + "="*30)
     print("Starting BLIP Tagging Phase...")
     print("="*30)
 
     try:
-        blip_tagger = BlipTagger(config_path=config_path)
+        blip_tagger = BlipTagger(config_path=config_path, device=device)
     except Exception as e:
         print(f"BLIP Tagger 초기화 중 오류 발생: {e}")
         return
@@ -177,27 +176,36 @@ def main():
     if args.gpu is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
     
+    from face import FaceDetector
+    
     target_path = Path(args.target_dir)
     
     if not target_path.is_dir():
         print(f"오류: '{args.target_dir}'는 유효한 디렉토리가 아닙니다.")
         return
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-    else:
+    if args.gpu is None:
         device = torch.device("cpu")
+    else:
+        if not torch.cuda.is_available():
+            print("오류: CUDA를 사용할 수 없습니다. GPU가 설치되어 있고 올바르게 구성되었는지 확인하세요.")
+            return
+        try:
+            device = torch.device(f"cuda:{args.gpu}")
+        except RuntimeError:
+            print(f"오류: 지정된 GPU ID {args.gpu}를 찾을 수 없습니다.")
+            return
     print(f"Using device: {device}")
 
     try:
         # Phase 1: Image Processing and Sorting
-        face_detector = FaceDetector()
+        face_detector = FaceDetector(device=device)
         file_manager = FileManager(target_path)
         counter = Counter()
         process_images(target_path, file_manager, face_detector, counter)
 
         # Phase 2: BLIP Tagging
-        run_tagging_phase(target_path)
+        run_tagging_phase(target_path, device=device)
 
     except Exception as e:
         print(f"프로세스 초기화 중 치명적 오류 발생: {e}")

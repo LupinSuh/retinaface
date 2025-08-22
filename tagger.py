@@ -5,7 +5,7 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 import os
 
 class BlipTagger:
-    def __init__(self, config_path="tagger_config.yaml"):
+    def __init__(self, config_path="tagger_config.yaml", device=None):
         """Initializes the Tagger by loading the model and processor based on the config file."""
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Configuration file not found at: {config_path}")
@@ -14,7 +14,8 @@ class BlipTagger:
             self.config = yaml.safe_load(f)
 
         model_path = self.config.get("model_path", "Salesforce/blip-image-captioning-base")
-        device = self.config.get("device", "auto")
+        if device is None:
+            device = self.config.get("device", "auto")
 
         print(f"\nLoading BLIP model from: {model_path}")
         self.processor = BlipProcessor.from_pretrained(model_path)
